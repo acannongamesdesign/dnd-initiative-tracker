@@ -21,6 +21,7 @@ import { advanceTurn, removeConditionsBySource } from '../utils/conditions'
 import { applyHpInput } from '../utils/hp'
 import { cloneCombatState, createCombatFromEncounter, normalizeOrder, rollInitiative } from '../utils/combat'
 import { CombatantRow } from '../components/CombatantRow'
+import { rollExpression, formatRollSummary } from '../utils/dice'
 
 type QuickAdd = {
   monsterId: string
@@ -35,6 +36,14 @@ const createEmptyCombatant = (name: string, kind: Combatant['kind']): Combatant 
   kind,
   initiative: 10,
   hp: { current: 10, max: 10, temp: 0 },
+  display: {
+    showTraits: false,
+    showActions: true,
+    showReactions: false,
+    showLegendary: true,
+    showLair: true,
+    showNotes: true,
+  },
   conditions: [],
   notes: '',
   isConcentrating: false,
@@ -56,6 +65,15 @@ export const CombatPage = () => {
     name: '',
     kind: 'npc',
   })
+  const [rollInput, setRollInput] = useState('1d20+5')
+  const [rollLog, setRollLog] = useState<string[]>([])
+  const [rollOpen, setRollOpen] = useState(true)
+  const [rollAutoOpen, setRollAutoOpen] = useState(true)
+
+  const monsterMap = useMemo(
+    () => new Map(monsters?.map((monster) => [monster.id, monster]) ?? []),
+    [monsters],
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -82,6 +100,20 @@ export const CombatPage = () => {
     return () => window.clearTimeout(timer)
   }, [combat])
 
+  useEffect(() => {
+    if (!combatStates || combatStates.length === 0 || combat) return
+    setCombat(combatStates[0])
+    setSelectedStateId(combatStates[0].id)
+  }, [combatStates, combat])
+
+  useEffect(() => {
+    return () => {
+      if (combat) {
+        void db.combatStates.put({ ...combat, updatedAt: Date.now() })
+      }
+    }
+  }, [combat])
+
   const applyAction = (updater: (state: CombatState) => CombatState) => {
     setCombat((prev) => {
       if (!prev) return prev
@@ -104,10 +136,21 @@ export const CombatPage = () => {
 
   const removeCombatant = (id: string) => {
     applyAction((state) => {
-      const combatants = removeConditionsBySource(
+      const removed = state.combatants.find((item) => item.id === id)
+      let combatants = removeConditionsBySource(
         state.combatants.filter((item) => item.id !== id),
         id,
       )
+      if (removed?.kind === 'monster' && removed.monsterId) {
+        const stillHasMonster = combatants.some(
+          (item) => item.kind === 'monster' && item.monsterId === removed.monsterId,
+        )
+        if (!stillHasMonster) {
+          combatants = combatants.filter(
+            (item) => !(item.kind === 'lair' && item.monsterId === removed.monsterId),
+          )
+        }
+      }
       const order = normalizeOrder(combatants, state.order)
       const currentId = state.order[state.currentIndex]
       const nextIndex = Math.max(0, order.indexOf(currentId))
@@ -161,6 +204,14 @@ export const CombatPage = () => {
         initiative: 10,
         dex: monster.abilities.dex,
         hp: { current: monster.defense.hp, max: monster.defense.hp, temp: 0 },
+        display: {
+          showTraits: false,
+          showActions: true,
+          showReactions: false,
+          showLegendary: true,
+          showLair: true,
+          showNotes: true,
+        },
         conditions: [],
         notes: '',
         isConcentrating: false,
@@ -168,6 +219,37 @@ export const CombatPage = () => {
       }))
       const combatants = [...state.combatants, ...additions]
       const order = normalizeOrder(combatants, state.order.concat(additions.map((item) => item.id)))
+
+      if (monster.lairActions?.length) {
+        const hasLair = combatants.some(
+          (item) => item.kind === 'lair' && item.monsterId === monster.id,
+        )
+        if (!hasLair) {
+          const lairCombatant: Combatant = {
+            id: createId(),
+            name: monster.lairName?.trim() || `${monster.name} Lair`,
+            kind: 'lair',
+            monsterId: monster.id,
+            initiative: 20,
+            hp: { current: 0, max: 0, temp: 0 },
+            display: {
+              showTraits: false,
+              showActions: false,
+              showReactions: false,
+              showLegendary: false,
+              showLair: true,
+              showNotes: true,
+            },
+            conditions: [],
+            notes: '',
+            isConcentrating: false,
+            updatedAt: Date.now(),
+          }
+          combatants.push(lairCombatant)
+          order.push(lairCombatant.id)
+        }
+      }
+
       return { ...state, combatants, order, updatedAt: Date.now() }
     })
   }
@@ -192,6 +274,13 @@ export const CombatPage = () => {
         .map((item) => item.id)
       return { ...state, order: sorted, currentIndex: 0, updatedAt: Date.now() }
     })
+  }
+
+  const pushRollLog = (entry: string) => {
+    setRollLog((items) => [entry, ...items].slice(0, 12))
+    if (rollAutoOpen) {
+      setRollOpen(true)
+    }
   }
 
   return (
@@ -400,16 +489,35 @@ export const CombatPage = () => {
                 {combat.order.map((id, index) => {
                   const combatant = combat.combatants.find((item) => item.id === id)
                   if (!combatant) return null
+                  const monster = combatant.monsterId ? monsterMap.get(combatant.monsterId) : undefined
                   const isCurrent = index === combat.currentIndex
                   const isOnDeck = index === (combat.currentIndex + 1) % combat.order.length
                   return (
                     <CombatantRow
                       key={combatant.id}
                       combatant={combatant}
+                      monster={monster}
                       combatants={combat.combatants}
                       isCurrent={isCurrent}
                       isOnDeck={isOnDeck}
                       round={combat.round}
+                      onLogRoll={pushRollLog}
+                      onUpdateDisplay={(display) =>
+                        updateCombatant(combatant.id, (item) => ({
+                          ...item,
+                          display: {
+                            showTraits: false,
+                            showActions: true,
+                            showReactions: false,
+                            showLegendary: true,
+                            showLair: true,
+                            showNotes: true,
+                            ...item.display,
+                            ...display,
+                          },
+                          updatedAt: Date.now(),
+                        }))
+                      }
                       onUpdate={(updated) => updateCombatant(combatant.id, () => updated)}
                       onRemove={() => removeCombatant(combatant.id)}
                       onApplyHp={(value) =>
@@ -479,6 +587,74 @@ export const CombatPage = () => {
           <div className="rounded-2xl border border-stone-500/20 bg-stone-950/40 p-6 text-sm text-stone-300">
             Start or load a combat to begin tracking turns.
           </div>
+        )}
+      </div>
+
+      <div
+        className={`fixed bottom-6 right-6 z-50 max-w-[90vw] rounded-2xl border border-stone-500/30 bg-stone-950/90 shadow-xl backdrop-blur ${
+          rollOpen ? 'w-[320px] p-4' : 'w-auto p-2'
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setRollOpen((open) => !open)}
+            className="rounded-md border border-stone-400/40 px-2 py-1 text-[11px] text-stone-200"
+          >
+            {rollOpen ? 'Hide Dice' : 'Show Dice'}
+          </button>
+          {rollOpen && (
+            <button
+              type="button"
+              onClick={() => setRollLog([])}
+              className="rounded-md border border-stone-400/40 px-2 py-1 text-[11px] text-stone-200"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        {rollOpen && (
+          <>
+            <label className="mt-2 flex items-center gap-2 text-[11px] text-stone-300">
+              <input
+                type="checkbox"
+                checked={rollAutoOpen}
+                onChange={(event) => setRollAutoOpen(event.target.checked)}
+              />
+              Auto-open on roll
+            </label>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <input
+                value={rollInput}
+                onChange={(event) => setRollInput(event.target.value)}
+                placeholder="e.g. 2d6+3"
+                className="w-32 flex-1 rounded-md border border-stone-400/30 bg-stone-950/40 px-3 py-2 text-xs text-stone-100"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const result = rollExpression(rollInput)
+                  if (result) {
+                    pushRollLog(formatRollSummary('Roll', rollInput, result))
+                  }
+                }}
+                className="rounded-md bg-amber-500 px-3 py-2 text-xs font-semibold text-stone-900"
+              >
+                Roll
+              </button>
+            </div>
+            {rollLog.length > 0 ? (
+              <div className="mt-3 max-h-60 space-y-2 overflow-y-auto text-[11px] text-stone-300">
+                {rollLog.map((entry, index) => (
+                  <div key={`${entry}-${index}`} className="rounded-md bg-stone-900/40 px-3 py-2">
+                    {entry}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-[11px] text-stone-500">Enter a dice expression to roll.</p>
+            )}
+          </>
         )}
       </div>
     </div>

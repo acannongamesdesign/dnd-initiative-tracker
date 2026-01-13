@@ -1,4 +1,5 @@
 import { skillList } from '../models'
+import type { AbilityKey, SkillKey } from '../models'
 
 export const abilityMod = (score: number) => Math.floor((score - 10) / 2)
 
@@ -15,7 +16,9 @@ export const proficiencyBonusFromCr = (cr: number) => {
 
 export const formatSigned = (value: number) => (value >= 0 ? `+${value}` : `${value}`)
 
-export const skillAbilityMap = new Map(skillList.map((skill) => [skill.key, skill.ability]))
+export const skillAbilityMap = new Map<SkillKey, AbilityKey>(
+  skillList.map((skill) => [skill.key, skill.ability as AbilityKey]),
+)
 
 export const clampNumber = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value))

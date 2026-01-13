@@ -2,6 +2,15 @@ import type { CombatState, Combatant, Encounter, Monster } from '../models'
 import { createId } from './id'
 import { abilityMod } from './rules'
 
+const defaultDisplay = () => ({
+  showTraits: false,
+  showActions: true,
+  showReactions: false,
+  showLegendary: true,
+  showLair: true,
+  showNotes: true,
+})
+
 export const createCombatState = (name: string): CombatState => ({
   id: createId(),
   name,
@@ -18,12 +27,16 @@ export const createCombatFromEncounter = (
 ): CombatState => {
   const combatants: Combatant[] = []
   const monsterMap = new Map(monsters.map((monster) => [monster.id, monster]))
+  const lairMonsters = new Map<string, Monster>()
 
   for (const entry of encounter.combatants) {
     const quantity = Math.max(1, entry.quantity)
     for (let i = 0; i < quantity; i += 1) {
       const suffix = quantity > 1 ? ` ${i + 1}` : ''
       const monster = entry.monsterId ? monsterMap.get(entry.monsterId) : undefined
+      if (monster?.lairActions?.length) {
+        lairMonsters.set(monster.id, monster)
+      }
       const dex = monster ? monster.abilities.dex : undefined
       combatants.push({
         id: createId(),
@@ -37,8 +50,34 @@ export const createCombatFromEncounter = (
           max: entry.hpMax ?? monster?.defense.hp ?? 10,
           temp: 0,
         },
+        display: defaultDisplay(),
         conditions: [],
         notes: entry.notes,
+        isConcentrating: false,
+        updatedAt: Date.now(),
+      })
+    }
+  }
+
+  if (lairMonsters.size > 0) {
+    for (const monster of lairMonsters.values()) {
+      combatants.push({
+        id: createId(),
+        name: monster.lairName?.trim() || `${monster.name} Lair`,
+        kind: 'lair',
+        monsterId: monster.id,
+        initiative: 20,
+        hp: { current: 0, max: 0, temp: 0 },
+        display: {
+          showTraits: false,
+          showActions: false,
+          showReactions: false,
+          showLegendary: false,
+          showLair: true,
+          showNotes: true,
+        },
+        conditions: [],
+        notes: '',
         isConcentrating: false,
         updatedAt: Date.now(),
       })
@@ -64,6 +103,9 @@ export const createCombatFromEncounter = (
 
 export const rollInitiative = (combatants: Combatant[]) =>
   combatants.map((combatant) => {
+    if (combatant.kind === 'lair') {
+      return { ...combatant, initiative: 20 }
+    }
     const mod = combatant.dex !== undefined ? abilityMod(combatant.dex) : 0
     return {
       ...combatant,

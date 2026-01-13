@@ -11,6 +11,8 @@ export const traitSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
+  attackBonus: z.number().int().optional(),
+  damageDice: z.string().optional(),
 })
 
 export const abilityScoresSchema = z.object({
@@ -58,6 +60,8 @@ export const monsterSchema = z.object({
   actions: z.array(traitSchema),
   reactions: z.array(traitSchema),
   legendary: z.array(traitSchema),
+  lairName: z.string().optional().default(''),
+  lairActions: z.array(traitSchema).default([]),
   notes: z.string().optional(),
   updatedAt: z.number(),
 })
@@ -114,7 +118,7 @@ export const conditionSchema = z.object({
 export const combatantSchema = z.object({
   id: z.string(),
   name: z.string(),
-  kind: z.enum(['pc', 'npc', 'monster']),
+  kind: z.enum(['pc', 'npc', 'monster', 'lair']),
   monsterId: z.string().optional(),
   initiative: z.number().int(),
   dex: z.number().int().optional(),
@@ -123,6 +127,16 @@ export const combatantSchema = z.object({
     max: z.number().int(),
     temp: z.number().int(),
   }),
+  display: z
+    .object({
+      showTraits: z.boolean(),
+      showActions: z.boolean(),
+      showReactions: z.boolean(),
+      showLegendary: z.boolean(),
+      showLair: z.boolean(),
+      showNotes: z.boolean(),
+    })
+    .optional(),
   conditions: z.array(conditionSchema),
   notes: z.string().optional(),
   isConcentrating: z.boolean(),

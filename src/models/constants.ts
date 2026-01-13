@@ -1,5 +1,4 @@
 export const abilityKeys = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const
-export type AbilityKey = (typeof abilityKeys)[number]
 
 export const skillList = [
   { key: 'acrobatics', label: 'Acrobatics', ability: 'dex' },
@@ -21,5 +20,3 @@ export const skillList = [
   { key: 'stealth', label: 'Stealth', ability: 'dex' },
   { key: 'survival', label: 'Survival', ability: 'wis' },
 ] as const
-
-export type SkillKey = (typeof skillList)[number]['key']

@@ -1,5 +1,5 @@
-@import "tailwindcss";
 @import url("https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Space+Grotesk:wght@400;600&display=swap");
+@import "tailwindcss";
 
 :root {
   font-family: "Space Grotesk", system-ui, sans-serif;

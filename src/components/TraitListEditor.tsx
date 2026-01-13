@@ -5,7 +5,7 @@ import { createId } from '../utils/id'
 type TraitListEditorProps = {
   control: Control<Monster>
   register: UseFormRegister<Monster>
-  name: 'traits' | 'actions' | 'reactions' | 'legendary'
+  name: 'traits' | 'actions' | 'reactions' | 'legendary' | 'lairActions'
   label: string
 }
 
@@ -27,11 +27,11 @@ export const TraitListEditor = ({ control, register, name, label }: TraitListEdi
       <div className="space-y-3">
         {fields.map((field, index) => (
           <div key={field.id} className="rounded-lg border border-stone-500/20 bg-stone-950/40 p-3">
-            <div className="flex items-start gap-3">
+            <div className="flex flex-wrap items-start gap-3">
               <input
                 {...register(`${name}.${index}.name`)}
                 placeholder="Name"
-                className="w-1/3 rounded-md border border-stone-300/20 bg-stone-900/40 px-3 py-2 text-sm text-stone-100"
+                className="w-full md:w-1/3 rounded-md border border-stone-300/20 bg-stone-900/40 px-3 py-2 text-sm text-stone-100"
               />
               <textarea
                 {...register(`${name}.${index}.description`)}
@@ -39,6 +39,27 @@ export const TraitListEditor = ({ control, register, name, label }: TraitListEdi
                 rows={2}
                 className="flex-1 rounded-md border border-stone-300/20 bg-stone-900/40 px-3 py-2 text-sm text-stone-100"
               />
+              <div className="flex flex-wrap gap-2">
+                <label className="text-[11px] uppercase tracking-wide text-stone-400">
+                  To Hit
+                  <input
+                    type="number"
+                    {...register(`${name}.${index}.attackBonus`, {
+                      valueAsNumber: true,
+                      setValueAs: (value) => (value === '' ? undefined : Number(value)),
+                    })}
+                    className="mt-1 w-20 rounded-md border border-stone-300/20 bg-stone-900/40 px-2 py-1 text-xs text-stone-100"
+                  />
+                </label>
+                <label className="text-[11px] uppercase tracking-wide text-stone-400">
+                  Damage Dice
+                  <input
+                    {...register(`${name}.${index}.damageDice`)}
+                    placeholder="2d6+3"
+                    className="mt-1 w-24 rounded-md border border-stone-300/20 bg-stone-900/40 px-2 py-1 text-xs text-stone-100"
+                  />
+                </label>
+              </div>
               <button
                 type="button"
                 onClick={() => remove(index)}

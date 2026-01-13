@@ -25,6 +25,8 @@ export const createEmptyMonster = (name = 'New Monster'): Monster => ({
   actions: [],
   reactions: [],
   legendary: [],
+  lairName: '',
+  lairActions: [],
   notes: '',
   updatedAt: Date.now(),
 })

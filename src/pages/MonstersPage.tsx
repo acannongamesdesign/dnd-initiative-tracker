@@ -60,7 +60,11 @@ export const MonstersPage = () => {
 
   useEffect(() => {
     if (selectedMonster) {
-      reset(selectedMonster)
+      reset({
+        ...selectedMonster,
+        lairName: selectedMonster.lairName ?? '',
+        lairActions: selectedMonster.lairActions ?? [],
+      })
     }
   }, [reset, selectedMonster])
 
@@ -95,7 +99,7 @@ export const MonstersPage = () => {
     return base + prof
   }
 
-  const skillBonus = (skillKey: string) => {
+  const skillBonus = (skillKey: (typeof skillList)[number]['key']) => {
     const ability = skillAbilityMap.get(skillKey) ?? 'int'
     const base = abilityMod(watched?.abilities?.[ability] ?? 10)
     const prof =
@@ -474,6 +478,23 @@ export const MonstersPage = () => {
             <TraitListEditor control={control} register={register} name="actions" label="Actions" />
             <TraitListEditor control={control} register={register} name="reactions" label="Reactions" />
             <TraitListEditor control={control} register={register} name="legendary" label="Legendary" />
+          </div>
+        </details>
+
+        <details className="rounded-2xl border border-stone-500/20 bg-stone-950/40 p-6">
+          <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-stone-200">
+            Lair
+          </summary>
+          <div className="mt-4 space-y-4">
+            <label className="text-sm text-stone-300">
+              Lair Name
+              <input
+                {...register('lairName')}
+                placeholder="Ancient shrine, bandit keep, etc."
+                className="mt-1 w-full rounded-md border border-stone-400/30 bg-stone-950/40 px-3 py-2 text-sm text-stone-100"
+              />
+            </label>
+            <TraitListEditor control={control} register={register} name="lairActions" label="Lair Actions" />
           </div>
         </details>
 
